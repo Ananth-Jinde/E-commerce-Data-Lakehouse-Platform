@@ -1,0 +1,11 @@
+database,datasource,tablename,loadtype,watermark,is_active,targetpath
+ecom-store-a,store-a,dbo.customers,Incremental,ModifiedDate,1,store_a
+ecom-store-a,store-a,dbo.products,Incremental,ModifiedDate,1,store_a
+ecom-store-a,store-a,dbo.orders,Incremental,ModifiedDate,1,store_a
+ecom-store-a,store-a,dbo.order_items,Incremental,InsertDate,1,store_a
+ecom-store-a,store-a,dbo.product_categories,Full,,1,store_a
+ecom-store-b,store-b,dbo.customer_info,Incremental,UpdateDt,1,store_b
+ecom-store-b,store-b,dbo.product_catalog,Incremental,UpdateDt,1,store_b
+ecom-store-b,store-b,dbo.order_log,Incremental,UpdateDt,1,store_b
+ecom-store-b,store-b,dbo.order_details,Incremental,CreateDt,1,store_b
+ecom-store-b,store-b,dbo.product_categories,Full,,1,store_b

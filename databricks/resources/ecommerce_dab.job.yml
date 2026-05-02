@@ -1,0 +1,46 @@
+resources:
+  jobs:
+    ecommerce_silver_job:
+      name: "ecommerce_silver_transformation"
+      schedule:
+        quartz_cron_expression: "0 0 6 * * ?"
+        timezone_id: "Asia/Kolkata"
+      tasks:
+        - task_key: "silver_customers"
+          notebook_task:
+            notebook_path: ../src/silver/customers.py
+          existing_cluster_id: "0502-143829-abcde123"
+        - task_key: "silver_products"
+          notebook_task:
+            notebook_path: ../src/silver/products.py
+          existing_cluster_id: "0502-143829-abcde123"
+        - task_key: "silver_product_categories"
+          notebook_task:
+            notebook_path: ../src/silver/product_categories.py
+          existing_cluster_id: "0502-143829-abcde123"
+        - task_key: "silver_orders"
+          depends_on:
+            - task_key: "silver_customers"
+          notebook_task:
+            notebook_path: ../src/silver/orders.py
+          existing_cluster_id: "0502-143829-abcde123"
+        - task_key: "silver_order_items"
+          depends_on:
+            - task_key: "silver_orders"
+            - task_key: "silver_products"
+          notebook_task:
+            notebook_path: ../src/silver/order_items.py
+          existing_cluster_id: "0502-143829-abcde123"
+        - task_key: "silver_product_reviews"
+          depends_on:
+            - task_key: "silver_products"
+          notebook_task:
+            notebook_path: ../src/silver/product_reviews.py
+          existing_cluster_id: "0502-143829-abcde123"
+        - task_key: "gold_dlt_pipeline"
+          depends_on:
+            - task_key: "silver_order_items"
+            - task_key: "silver_product_reviews"
+            - task_key: "silver_product_categories"
+          pipeline_task:
+            pipeline_id: "${resources.pipelines.ecommerce_gold_dlt.id}"

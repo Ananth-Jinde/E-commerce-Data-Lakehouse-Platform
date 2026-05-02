@@ -1,0 +1,15 @@
+{
+    "name": "ls_azure_sql_store_b",
+    "type": "Microsoft.DataFactory/factories/linkedservices",
+    "properties": {
+        "description": "Azure SQL Database — Store B (ecom-store-b).",
+        "type": "AzureSqlDatabase",
+        "typeProperties": {
+            "connectionString": {
+                "type": "AzureKeyVaultSecret",
+                "store": { "referenceName": "ls_key_vault", "type": "LinkedServiceReference" },
+                "secretName": "sql-store-b-connection-string"
+            }
+        }
+    }
+}

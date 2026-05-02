@@ -1,0 +1,45 @@
+-- Store B DDL — Database: ecom-store-b (DIFFERENT column names from Store A!)
+CREATE DATABASE [ecom-store-b];
+GO
+USE [ecom-store-b];
+GO
+
+CREATE TABLE dbo.product_categories (
+    CatID NVARCHAR(10) NOT NULL PRIMARY KEY,
+    CatName NVARCHAR(100) NOT NULL,
+    ParentCat NVARCHAR(10) NULL
+);
+
+CREATE TABLE dbo.customer_info (
+    CustID NVARCHAR(20) NOT NULL PRIMARY KEY,
+    FName NVARCHAR(50) NOT NULL, LName NVARCHAR(50) NOT NULL,
+    EmailAddr NVARCHAR(100) NOT NULL, PhoneNum NVARCHAR(20) NULL,
+    Street NVARCHAR(200) NOT NULL, Town NVARCHAR(50) NOT NULL,
+    Region NVARCHAR(10) NOT NULL, PostalCode NVARCHAR(10) NOT NULL,
+    CreateDt DATE NOT NULL, UpdateDt DATE NOT NULL
+);
+
+CREATE TABLE dbo.product_catalog (
+    ProdID NVARCHAR(20) NOT NULL PRIMARY KEY,
+    ProdName NVARCHAR(200) NOT NULL, Cat NVARCHAR(100) NOT NULL,
+    SubCat NVARCHAR(100) NOT NULL, ListPrice DECIMAL(10,2) NOT NULL,
+    AvailableQty INT NOT NULL, VendorName NVARCHAR(100) NOT NULL,
+    CreateDt DATE NOT NULL, UpdateDt DATE NOT NULL
+);
+
+CREATE TABLE dbo.order_log (
+    OrdID NVARCHAR(20) NOT NULL PRIMARY KEY,
+    CustID NVARCHAR(20) NOT NULL REFERENCES dbo.customer_info(CustID),
+    OrdDate DATE NOT NULL, ShipDt DATE NULL, OrdStatus NVARCHAR(20) NOT NULL,
+    GrandTotal DECIMAL(12,2) NOT NULL, PayMode NVARCHAR(30) NOT NULL,
+    ShipAddr NVARCHAR(300) NULL, CreateDt DATE NOT NULL, UpdateDt DATE NOT NULL
+);
+
+CREATE TABLE dbo.order_details (
+    DetailID NVARCHAR(20) NOT NULL PRIMARY KEY,
+    OrdID NVARCHAR(20) NOT NULL REFERENCES dbo.order_log(OrdID),
+    ProdID NVARCHAR(20) NOT NULL REFERENCES dbo.product_catalog(ProdID),
+    Qty INT NOT NULL, Price DECIMAL(10,2) NOT NULL,
+    DiscountPct DECIMAL(5,1) DEFAULT 0, Amount DECIMAL(12,2) NOT NULL,
+    CreateDt DATE NOT NULL
+);

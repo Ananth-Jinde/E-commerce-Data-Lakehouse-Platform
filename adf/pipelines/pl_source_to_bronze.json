@@ -1,0 +1,191 @@
+{
+    "name": "pl_source_to_bronze",
+    "properties": {
+        "description": "Metadata-driven ingestion pipeline. Reads load_config.csv, iterates over active tables using ForEach (parallel, batch=5). Supports Full and Incremental load types with audit logging.",
+        "activities": [
+            {
+                "name": "Lookup_Config",
+                "description": "Read metadata config file for table list",
+                "type": "Lookup",
+                "dependsOn": [],
+                "policy": { "timeout": "0.00:10:00", "retry": 2, "retryIntervalInSeconds": 30 },
+                "typeProperties": {
+                    "source": {
+                        "type": "DelimitedTextSource",
+                        "storeSettings": { "type": "AzureBlobFSReadSettings", "recursive": false },
+                        "formatSettings": { "type": "DelimitedTextReadSettings" }
+                    },
+                    "dataset": { "referenceName": "ds_config_csv", "type": "DatasetReference" },
+                    "firstRowOnly": false
+                }
+            },
+            {
+                "name": "Filter_Active_Tables",
+                "description": "Filter only tables where is_active = 1",
+                "type": "Filter",
+                "dependsOn": [
+                    { "activity": "Lookup_Config", "dependencyConditions": ["Succeeded"] }
+                ],
+                "typeProperties": {
+                    "items": { "value": "@activity('Lookup_Config').output.value", "type": "Expression" },
+                    "condition": { "value": "@equals(item().is_active, '1')", "type": "Expression" }
+                }
+            },
+            {
+                "name": "ForEach_Table",
+                "description": "Iterate over each active table in parallel (batch=5)",
+                "type": "ForEach",
+                "dependsOn": [
+                    { "activity": "Filter_Active_Tables", "dependencyConditions": ["Succeeded"] }
+                ],
+                "typeProperties": {
+                    "isSequential": false,
+                    "batchCount": 5,
+                    "items": { "value": "@activity('Filter_Active_Tables').output.value", "type": "Expression" },
+                    "activities": [
+                        {
+                            "name": "Get_Metadata_FileExists",
+                            "description": "Check if parquet file already exists in bronze",
+                            "type": "GetMetadata",
+                            "dependsOn": [],
+                            "policy": { "timeout": "0.00:05:00", "retry": 1, "retryIntervalInSeconds": 30 },
+                            "typeProperties": {
+                                "dataset": {
+                                    "referenceName": "ds_parquet_bronze",
+                                    "type": "DatasetReference",
+                                    "parameters": {
+                                        "Container": "bronze",
+                                        "FolderPath": { "value": "@item().targetpath", "type": "Expression" },
+                                        "FileName": { "value": "@concat(last(split(item().tablename, '.')), '.parquet')", "type": "Expression" }
+                                    }
+                                },
+                                "fieldList": ["exists"]
+                            }
+                        },
+                        {
+                            "name": "If_File_Exists_Archive",
+                            "description": "Archive existing file before new data arrives",
+                            "type": "IfCondition",
+                            "dependsOn": [
+                                { "activity": "Get_Metadata_FileExists", "dependencyConditions": ["Succeeded"] }
+                            ],
+                            "typeProperties": {
+                                "expression": { "value": "@activity('Get_Metadata_FileExists').output.exists", "type": "Expression" },
+                                "ifTrueActivities": [
+                                    {
+                                        "name": "Archive_File",
+                                        "description": "Copy to archive folder with date partitioning",
+                                        "type": "Copy",
+                                        "policy": { "timeout": "0.00:10:00", "retry": 2, "retryIntervalInSeconds": 30 },
+                                        "typeProperties": {
+                                            "source": { "type": "ParquetSource", "storeSettings": { "type": "AzureBlobFSReadSettings" } },
+                                            "sink": { "type": "ParquetSink", "storeSettings": { "type": "AzureBlobFSWriteSettings" } }
+                                        },
+                                        "inputs": [{
+                                            "referenceName": "ds_parquet_bronze", "type": "DatasetReference",
+                                            "parameters": { "Container": "bronze", "FolderPath": "@item().targetpath", "FileName": "@concat(last(split(item().tablename, '.')), '.parquet')" }
+                                        }],
+                                        "outputs": [{
+                                            "referenceName": "ds_parquet_bronze", "type": "DatasetReference",
+                                            "parameters": {
+                                                "Container": "bronze",
+                                                "FolderPath": { "value": "@concat(item().targetpath, '/archive/', formatDateTime(utcNow(), 'yyyy/MM/dd'))", "type": "Expression" },
+                                                "FileName": "@concat(last(split(item().tablename, '.')), '.parquet')"
+                                            }
+                                        }]
+                                    }
+                                ]
+                            }
+                        },
+                        {
+                            "name": "If_LoadType",
+                            "description": "Branch: Full load vs Incremental load",
+                            "type": "IfCondition",
+                            "dependsOn": [
+                                { "activity": "If_File_Exists_Archive", "dependencyConditions": ["Succeeded"] }
+                            ],
+                            "typeProperties": {
+                                "expression": { "value": "@equals(item().loadtype, 'Full')", "type": "Expression" },
+                                "ifTrueActivities": [
+                                    {
+                                        "name": "Full_Load_Copy",
+                                        "description": "SELECT * FROM table + datasource column",
+                                        "type": "Copy",
+                                        "policy": { "timeout": "0.00:30:00", "retry": 2, "retryIntervalInSeconds": 30 },
+                                        "typeProperties": {
+                                            "source": {
+                                                "type": "AzureSqlSource",
+                                                "sqlReaderQuery": { "value": "@concat('SELECT *, ''', item().datasource, ''' AS datasource FROM ', item().tablename)", "type": "Expression" }
+                                            },
+                                            "sink": { "type": "ParquetSink", "storeSettings": { "type": "AzureBlobFSWriteSettings" } }
+                                        },
+                                        "inputs": [{ "referenceName": "ds_azure_sql", "type": "DatasetReference", "parameters": { "SchemaName": "dbo", "TableName": "@last(split(item().tablename, '.'))" } }],
+                                        "outputs": [{ "referenceName": "ds_parquet_bronze", "type": "DatasetReference", "parameters": { "Container": "bronze", "FolderPath": "@item().targetpath", "FileName": "@concat(last(split(item().tablename, '.')), '.parquet')" } }]
+                                    },
+                                    {
+                                        "name": "Audit_Full_Load",
+                                        "description": "Log to audit table",
+                                        "type": "Script",
+                                        "dependsOn": [{ "activity": "Full_Load_Copy", "dependencyConditions": ["Succeeded"] }],
+                                        "linkedServiceName": { "referenceName": "ls_delta_lake", "type": "LinkedServiceReference" },
+                                        "typeProperties": {
+                                            "scripts": [{
+                                                "type": "NonQuery",
+                                                "text": { "value": "@concat('INSERT INTO audit.load_logs (data_source, tablename, numberofrowscopied, watermarkcolumnname, loaddate) VALUES (''', item().datasource, ''', ''', item().tablename, ''', ', activity('Full_Load_Copy').output.rowsCopied, ', ''', item().watermark, ''', current_timestamp())')", "type": "Expression" }
+                                            }]
+                                        }
+                                    }
+                                ],
+                                "ifFalseActivities": [
+                                    {
+                                        "name": "Fetch_Last_Watermark",
+                                        "description": "Get last load date from audit table",
+                                        "type": "Script",
+                                        "linkedServiceName": { "referenceName": "ls_delta_lake", "type": "LinkedServiceReference" },
+                                        "typeProperties": {
+                                            "scripts": [{
+                                                "type": "Query",
+                                                "text": { "value": "@concat('SELECT COALESCE(CAST(MAX(loaddate) AS DATE), ''1900-01-01'') AS last_fetched_date FROM audit.load_logs WHERE data_source = ''', item().datasource, ''' AND tablename = ''', item().tablename, '''')", "type": "Expression" }
+                                            }]
+                                        }
+                                    },
+                                    {
+                                        "name": "Incremental_Load_Copy",
+                                        "description": "SELECT * WHERE watermark >= last_fetched_date",
+                                        "type": "Copy",
+                                        "dependsOn": [{ "activity": "Fetch_Last_Watermark", "dependencyConditions": ["Succeeded"] }],
+                                        "policy": { "timeout": "0.00:30:00", "retry": 2, "retryIntervalInSeconds": 30 },
+                                        "typeProperties": {
+                                            "source": {
+                                                "type": "AzureSqlSource",
+                                                "sqlReaderQuery": { "value": "@concat('SELECT *, ''', item().datasource, ''' AS datasource FROM ', item().tablename, ' WHERE ', item().watermark, ' >= ''', activity('Fetch_Last_Watermark').output.resultSets[0].rows[0].last_fetched_date, '''')", "type": "Expression" }
+                                            },
+                                            "sink": { "type": "ParquetSink", "storeSettings": { "type": "AzureBlobFSWriteSettings" } }
+                                        },
+                                        "inputs": [{ "referenceName": "ds_azure_sql", "type": "DatasetReference", "parameters": { "SchemaName": "dbo", "TableName": "@last(split(item().tablename, '.'))" } }],
+                                        "outputs": [{ "referenceName": "ds_parquet_bronze", "type": "DatasetReference", "parameters": { "Container": "bronze", "FolderPath": "@item().targetpath", "FileName": "@concat(last(split(item().tablename, '.')), '.parquet')" } }]
+                                    },
+                                    {
+                                        "name": "Audit_Incremental_Load",
+                                        "description": "Log to audit table",
+                                        "type": "Script",
+                                        "dependsOn": [{ "activity": "Incremental_Load_Copy", "dependencyConditions": ["Succeeded"] }],
+                                        "linkedServiceName": { "referenceName": "ls_delta_lake", "type": "LinkedServiceReference" },
+                                        "typeProperties": {
+                                            "scripts": [{
+                                                "type": "NonQuery",
+                                                "text": { "value": "@concat('INSERT INTO audit.load_logs (data_source, tablename, numberofrowscopied, watermarkcolumnname, loaddate) VALUES (''', item().datasource, ''', ''', item().tablename, ''', ', activity('Incremental_Load_Copy').output.rowsCopied, ', ''', item().watermark, ''', current_timestamp())')", "type": "Expression" }
+                                            }]
+                                        }
+                                    }
+                                ]
+                            }
+                        }
+                    ]
+                }
+            }
+        ],
+        "annotations": ["metadata-driven", "incremental", "full-load", "audit-logging"],
+        "folder": { "name": "ecommerce_ingestion" }
+    }
+}

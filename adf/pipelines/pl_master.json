@@ -1,0 +1,80 @@
+{
+    "name": "pl_master",
+    "properties": {
+        "description": "Master orchestration pipeline. Executes all child pipelines in sequence: Source→Bronze, Landing→Bronze, Bronze→Silver, Silver→Gold. Sends failure alert via Logic App webhook.",
+        "activities": [
+            {
+                "name": "Execute_Source_To_Bronze",
+                "description": "Step 1: Ingest SQL data to Bronze (Parquet)",
+                "type": "ExecutePipeline",
+                "dependsOn": [],
+                "typeProperties": {
+                    "pipeline": { "referenceName": "pl_source_to_bronze", "type": "PipelineReference" },
+                    "waitOnCompletion": true
+                }
+            },
+            {
+                "name": "Execute_Landing_To_Bronze",
+                "description": "Step 2: Convert flat files to Bronze (Parquet)",
+                "type": "ExecutePipeline",
+                "dependsOn": [
+                    { "activity": "Execute_Source_To_Bronze", "dependencyConditions": ["Succeeded"] }
+                ],
+                "typeProperties": {
+                    "pipeline": { "referenceName": "pl_landing_to_bronze", "type": "PipelineReference" },
+                    "waitOnCompletion": true
+                }
+            },
+            {
+                "name": "Execute_Bronze_To_Silver",
+                "description": "Step 3: Transform Bronze → Silver (CDM, Quality, SCD2)",
+                "type": "ExecutePipeline",
+                "dependsOn": [
+                    { "activity": "Execute_Landing_To_Bronze", "dependencyConditions": ["Succeeded"] }
+                ],
+                "typeProperties": {
+                    "pipeline": { "referenceName": "pl_bronze_to_silver", "type": "PipelineReference" },
+                    "waitOnCompletion": true
+                }
+            },
+            {
+                "name": "Execute_Silver_To_Gold",
+                "description": "Step 4: Build Gold star schema (DLT)",
+                "type": "ExecutePipeline",
+                "dependsOn": [
+                    { "activity": "Execute_Bronze_To_Silver", "dependencyConditions": ["Succeeded"] }
+                ],
+                "typeProperties": {
+                    "pipeline": { "referenceName": "pl_silver_to_gold", "type": "PipelineReference" },
+                    "waitOnCompletion": true
+                }
+            },
+            {
+                "name": "Alert_On_Failure",
+                "description": "Send failure notification via Logic App webhook",
+                "type": "WebActivity",
+                "dependsOn": [
+                    { "activity": "Execute_Source_To_Bronze", "dependencyConditions": ["Failed"] },
+                    { "activity": "Execute_Landing_To_Bronze", "dependencyConditions": ["Failed"] },
+                    { "activity": "Execute_Bronze_To_Silver", "dependencyConditions": ["Failed"] },
+                    { "activity": "Execute_Silver_To_Gold", "dependencyConditions": ["Failed"] }
+                ],
+                "policy": { "timeout": "0.00:05:00", "retry": 2, "retryIntervalInSeconds": 30 },
+                "typeProperties": {
+                    "url": { "value": "@pipeline().parameters.LogicAppWebhookUrl", "type": "Expression" },
+                    "method": "POST",
+                    "headers": { "Content-Type": "application/json" },
+                    "body": {
+                        "value": "@json(concat('{\"pipeline\": \"', pipeline().Pipeline, '\", \"run_id\": \"', pipeline().RunId, '\", \"status\": \"Failed\", \"timestamp\": \"', utcNow(), '\"}'))",
+                        "type": "Expression"
+                    }
+                }
+            }
+        ],
+        "parameters": {
+            "LogicAppWebhookUrl": { "type": "String", "defaultValue": "https://<your-logic-app-url>" }
+        },
+        "annotations": ["master", "orchestration"],
+        "folder": { "name": "ecommerce_orchestration" }
+    }
+}

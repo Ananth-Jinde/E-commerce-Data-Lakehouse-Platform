@@ -1,0 +1,11 @@
+{
+    "name": "ls_key_vault",
+    "type": "Microsoft.DataFactory/factories/linkedservices",
+    "properties": {
+        "description": "Azure Key Vault for secure secret management.",
+        "type": "AzureKeyVault",
+        "typeProperties": {
+            "baseUrl": "https://kv-ecom-data-dev.vault.azure.net/"
+        }
+    }
+}

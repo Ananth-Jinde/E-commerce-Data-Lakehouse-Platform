@@ -1,0 +1,11 @@
+[project]
+name = "ecommerce_data_lakehouse"
+version = "1.0.0"
+description = "Azure Data Lakehouse for E-Commerce analytics"
+requires-python = ">=3.10"
+
+[project.optional-dependencies]
+dev = ["pytest>=7.0.0", "faker>=19.0.0"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

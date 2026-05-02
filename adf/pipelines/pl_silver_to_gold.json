@@ -1,0 +1,21 @@
+{
+    "name": "pl_silver_to_gold",
+    "properties": {
+        "description": "Triggers the Databricks DLT pipeline for Gold layer star schema (dim_customer, dim_product, dim_date, dim_product_category, fact_orders).",
+        "activities": [
+            {
+                "name": "Run_Gold_DLT_Pipeline",
+                "description": "Execute DLT pipeline to build star schema from Silver Delta tables",
+                "type": "DatabricksNotebook",
+                "dependsOn": [],
+                "policy": { "timeout": "0.02:00:00", "retry": 1, "retryIntervalInSeconds": 120 },
+                "typeProperties": {
+                    "notebookPath": "/Repos/ecommerce-data-lakehouse/databricks/src/gold/run_gold_layer"
+                },
+                "linkedServiceName": { "referenceName": "ls_databricks", "type": "LinkedServiceReference" }
+            }
+        ],
+        "annotations": ["gold-layer", "dlt", "star-schema"],
+        "folder": { "name": "ecommerce_transformation" }
+    }
+}

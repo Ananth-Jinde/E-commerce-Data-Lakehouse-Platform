@@ -1,0 +1,17 @@
+{
+    "name": "ls_delta_lake",
+    "type": "Microsoft.DataFactory/factories/linkedservices",
+    "properties": {
+        "description": "Databricks Delta Lake for audit table operations.",
+        "type": "AzureDatabricksDeltaLake",
+        "typeProperties": {
+            "domain": "https://adb-2738456109234.8.azuredatabricks.net",
+            "accessToken": {
+                "type": "AzureKeyVaultSecret",
+                "store": { "referenceName": "ls_key_vault", "type": "LinkedServiceReference" },
+                "secretName": "databricks-access-token"
+            },
+            "clusterId": "0502-143829-abcde123"
+        }
+    }
+}

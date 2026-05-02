@@ -1,0 +1,10 @@
+{
+    "name": "ds_delta_audit",
+    "type": "Microsoft.DataFactory/factories/datasets",
+    "properties": {
+        "description": "Databricks Delta Lake dataset for audit.load_logs table.",
+        "linkedServiceName": { "referenceName": "ls_delta_lake", "type": "LinkedServiceReference" },
+        "type": "AzureDatabricksDeltaLakeDataset",
+        "typeProperties": { "database": "audit", "table": "load_logs" }
+    }
+}

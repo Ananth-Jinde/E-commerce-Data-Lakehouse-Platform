@@ -1,0 +1,26 @@
+bundle:
+  name: ecommerce_data_lakehouse
+
+workspace:
+  host: https://adb-2738456109234.8.azuredatabricks.net
+
+include:
+  - resources/*.yml
+
+targets:
+  dev:
+    mode: development
+    default: true
+    workspace:
+      root_path: /Workspace/Users/${workspace.current_user.userName}/.bundle/${bundle.name}/${bundle.target}
+  prod:
+    mode: production
+    workspace:
+      root_path: /Workspace/production/.bundle/${bundle.name}/${bundle.target}
+    permissions:
+      - level: CAN_VIEW
+        group_name: data-engineering-team
+      - level: CAN_MANAGE
+        group_name: data-platform-admins
+    run_as:
+      service_principal_name: ecommerce-pipeline-sp

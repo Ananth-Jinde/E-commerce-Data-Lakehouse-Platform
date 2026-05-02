@@ -1,0 +1,71 @@
+{
+    "name": "pl_bronze_to_silver",
+    "properties": {
+        "description": "Executes Databricks notebooks for Silver layer: CDM mapping, quality checks, SCD2 (dimensions), incremental append (transactions).",
+        "activities": [
+            {
+                "name": "Silver_Customers",
+                "description": "CDM + Quality + SCD2 for customers (both stores)",
+                "type": "DatabricksNotebook",
+                "dependsOn": [],
+                "policy": { "timeout": "0.01:00:00", "retry": 1, "retryIntervalInSeconds": 60 },
+                "typeProperties": { "notebookPath": "/Repos/ecommerce-data-lakehouse/databricks/src/silver/customers" },
+                "linkedServiceName": { "referenceName": "ls_databricks", "type": "LinkedServiceReference" }
+            },
+            {
+                "name": "Silver_Products",
+                "description": "CDM + Quality + SCD2 for products (both stores)",
+                "type": "DatabricksNotebook",
+                "dependsOn": [],
+                "policy": { "timeout": "0.01:00:00", "retry": 1, "retryIntervalInSeconds": 60 },
+                "typeProperties": { "notebookPath": "/Repos/ecommerce-data-lakehouse/databricks/src/silver/products" },
+                "linkedServiceName": { "referenceName": "ls_databricks", "type": "LinkedServiceReference" }
+            },
+            {
+                "name": "Silver_Product_Categories",
+                "description": "Full load for categories (small reference table)",
+                "type": "DatabricksNotebook",
+                "dependsOn": [],
+                "policy": { "timeout": "0.01:00:00", "retry": 1, "retryIntervalInSeconds": 60 },
+                "typeProperties": { "notebookPath": "/Repos/ecommerce-data-lakehouse/databricks/src/silver/product_categories" },
+                "linkedServiceName": { "referenceName": "ls_databricks", "type": "LinkedServiceReference" }
+            },
+            {
+                "name": "Silver_Orders",
+                "description": "CDM + Quality + Incremental append (depends on customers for FK)",
+                "type": "DatabricksNotebook",
+                "dependsOn": [
+                    { "activity": "Silver_Customers", "dependencyConditions": ["Succeeded"] }
+                ],
+                "policy": { "timeout": "0.01:00:00", "retry": 1, "retryIntervalInSeconds": 60 },
+                "typeProperties": { "notebookPath": "/Repos/ecommerce-data-lakehouse/databricks/src/silver/orders" },
+                "linkedServiceName": { "referenceName": "ls_databricks", "type": "LinkedServiceReference" }
+            },
+            {
+                "name": "Silver_Order_Items",
+                "description": "CDM + discount normalization + Incremental append (depends on orders + products)",
+                "type": "DatabricksNotebook",
+                "dependsOn": [
+                    { "activity": "Silver_Orders", "dependencyConditions": ["Succeeded"] },
+                    { "activity": "Silver_Products", "dependencyConditions": ["Succeeded"] }
+                ],
+                "policy": { "timeout": "0.01:00:00", "retry": 1, "retryIntervalInSeconds": 60 },
+                "typeProperties": { "notebookPath": "/Repos/ecommerce-data-lakehouse/databricks/src/silver/order_items" },
+                "linkedServiceName": { "referenceName": "ls_databricks", "type": "LinkedServiceReference" }
+            },
+            {
+                "name": "Silver_Product_Reviews",
+                "description": "Quality checks + Incremental append (from flat file, depends on products)",
+                "type": "DatabricksNotebook",
+                "dependsOn": [
+                    { "activity": "Silver_Products", "dependencyConditions": ["Succeeded"] }
+                ],
+                "policy": { "timeout": "0.01:00:00", "retry": 1, "retryIntervalInSeconds": 60 },
+                "typeProperties": { "notebookPath": "/Repos/ecommerce-data-lakehouse/databricks/src/silver/product_reviews" },
+                "linkedServiceName": { "referenceName": "ls_databricks", "type": "LinkedServiceReference" }
+            }
+        ],
+        "annotations": ["silver-layer", "cdm", "scd2", "quality-checks"],
+        "folder": { "name": "ecommerce_transformation" }
+    }
+}
