@@ -8,14 +8,27 @@
                 "description": "Execute DLT pipeline to build star schema from Silver Delta tables",
                 "type": "DatabricksNotebook",
                 "dependsOn": [],
-                "policy": { "timeout": "0.02:00:00", "retry": 1, "retryIntervalInSeconds": 120 },
+                "policy": {
+                    "timeout": "0.02:00:00",
+                    "retry": 1,
+                    "retryIntervalInSeconds": 120
+                },
                 "typeProperties": {
                     "notebookPath": "/Repos/ecommerce-data-lakehouse/databricks/src/gold/run_gold_layer"
                 },
-                "linkedServiceName": { "referenceName": "ls_databricks", "type": "LinkedServiceReference" }
+                "linkedServiceName": {
+                    "referenceName": "ls_databricks",
+                    "type": "LinkedServiceReference"
+                }
             }
         ],
-        "annotations": ["gold-layer", "dlt", "star-schema"],
-        "folder": { "name": "ecommerce_transformation" }
+        "annotations": [
+            "gold-layer",
+            "dlt",
+            "star-schema"
+        ],
+        "folder": {
+            "name": "ecommerce_transformation"
+        }
     }
 }
