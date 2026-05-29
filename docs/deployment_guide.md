@@ -296,7 +296,6 @@ CREATE EXTERNAL LOCATION gold_location
 
 1. Open `databricks/databricks.yml` in your editor
 2. Update the `workspace.host` with your Databricks workspace URL
-3. Update cluster IDs in `resources/ecommerce_dab.job.yml` with your cluster ID
 
 ### 4.2 Deploy (from your local terminal)
 
@@ -320,9 +319,8 @@ databricks bundle deploy -t dev
 
 ### 4.3 Verify Deployment
 
-1. In Databricks → **"Workflows"** → You should see `[dev] ecommerce_silver_transformation` job
-2. Click on it to see the task dependency graph
-3. In **"Delta Live Tables"** → You should see `[dev] ecommerce_gold_dlt_pipeline`
+1. In Databricks → **"Delta Live Tables"** → You should see `[dev] ecommerce_gold_dlt_pipeline`
+2. Since this bundle is deployment-only (ADF handles orchestration), the Silver notebooks are orchestrated directly from ADF, and the Gold DLT pipeline is triggered by the ADF pipeline.
 
 ---
 
